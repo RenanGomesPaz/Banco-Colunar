@@ -1,33 +1,75 @@
+import uuid
 from cassandra.cluster import Cluster
-from uuid import uuid4
 
+# Connect to the Cassandra cluster
 cluster = Cluster(['localhost'])
-session = cluster.connect('todolist') 
+session = cluster.connect('todolist')
+
+# Create the tasks table if it doesn't exist
+session.execute("""
+    CREATE TABLE IF NOT EXISTS tasks (
+        id UUID PRIMARY KEY,
+        title TEXT,
+        description TEXT
+    )
+""")
 
 def add_task(title, description):
-    task_id = uuid4()
+    # Generate a unique ID for the task
+    task_id = uuid.uuid4()
+    # Insert the task into the database
     session.execute("""
-        INSERT INTO tasks (task_id, title, description)
+        INSERT INTO tasks (id, title, description)
         VALUES (%s, %s, %s)
     """, (task_id, title, description))
 
 def list_tasks():
-    rows = session.execute('SELECT task_id, title FROM tasks')
+    # Retrieve and display all tasks
+    rows = session.execute("SELECT id, title FROM tasks")
     for row in rows:
-        print(f'Task ID: {row.task_id}, Title: {row.title}')
+        print('Task ID: {}, Title: {}'.format(row.id, row.title))
 
 def view_task_description(task_id):
-    row = session.execute('SELECT description FROM tasks WHERE task_id = %s', [task_id]).one()
+    # Retrieve and display the description of a specific task
+    row = session.execute("SELECT description FROM tasks WHERE id = %s", [task_id]).one()
     if row:
-        print(f'Task Description: {row.description}')
+        print('Task Description:', row.description)
     else:
         print('Task not found.')
 
 def remove_task(task_id):
-    session.execute('DELETE FROM tasks WHERE task_id = %s', [task_id])
+    # Remove a task from the database
+    session.execute("DELETE FROM tasks WHERE id = %s", [task_id])
+    print('Task removed.')
 
-add_task('Task 1', 'Description of Task 1')
-add_task('Task 2', 'Description of Task 2')
-list_tasks()
-view_task_description(task_id)
-remove_task(task_id)
+if __name__ == '__main__':
+    while True:
+        print('\nOptions:')
+        print('1. Add Task')
+        print('2. List Tasks')
+        print('3. View Task Description')
+        print('4. Remove Task')
+        print('5. Quit')
+
+        choice = raw_input('Enter your choice: ')
+
+        if choice == '1':
+            title = raw_input('Enter task title: ')
+            description = raw_input('Enter task description: ')
+            add_task(title, description)
+        elif choice == '2':
+            list_tasks()
+        elif choice == '3':
+            task_id = raw_input('Enter task ID to view description: ')
+            view_task_description(task_id)
+        elif choice == '4':
+            task_id = raw_input('Enter task ID to remove: ')
+            remove_task(task_id)
+        elif choice == '5':
+            break
+        else:
+            print('Invalid choice. Please try again.')
+
+# Close the Cassandra session and cluster when done
+session.shutdown()
+cluster.shutdown()
